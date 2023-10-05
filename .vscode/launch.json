@@ -5,18 +5,32 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Python: Module",
+      "name": "Tune",
       "type": "python",
       "request": "launch",
-      "program": "torch_loan_default/ldp_cli.py",
+      "program": "torch_loan_default/tune.py",
       "console": "integratedTerminal",
-      "justMyCode": true,
-      "args": [
-        "--model.learning_rate",
-        "0.01",
-        "--model.hidden_units",
-        "[32,12]"
-      ]
-    }
+      "justMyCode": true
+    },
+    {
+      "name": "Train",
+      "type": "python",
+      "request": "launch",
+      "module": "torch_loan_default",
+      "justMyCode": true
+    } // {
+    //   "name": "Python: Module",
+    //   "type": "python",
+    //   "request": "launch",
+    //   "program": "torch_loan_default/ldp_cli.py",
+    //   "console": "integratedTerminal",
+    //   "justMyCode": true,
+    //   "args": [
+    //     "--model.learning_rate",
+    //     "0.01",
+    //     "--model.hidden_units",
+    //     "[32,12]"
+    //   ]
+    // }
   ]
 }

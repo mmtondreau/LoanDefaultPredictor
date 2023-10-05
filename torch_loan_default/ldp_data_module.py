@@ -1,16 +1,31 @@
 import requests
 import os
-import lightning.pytorch as pl
+import pytorch_lightning as pl
 from torch.utils.data import random_split, DataLoader
 import torch
 from torch.utils.data import TensorDataset
 import pandas as pd
 import numpy as np
+from sklearn.model_selection import train_test_split
 
 
 class LDPDataModule(pl.LightningDataModule):
-    TRAIN_SIZE = 0.7
-    REMOVE_FEATURES = ["Default", "LoanID"]
+    # REMOVE_FEATURES = ["Default", "LoanID"]
+    REMOVE_FEATURES = [
+        "CreditScore",
+        "CreditUtilizationRate",
+        "Default",
+        "LoanID",
+        "HasCoSigner",
+        "LoanPurpose",
+        "HasDependents",
+        "HasMortgage",
+        "MaritalStatus",
+        "EmploymentType",
+        "Education",
+        "LoanTerm",
+        "NumCreditLines",
+    ]
     TEXT_COLUMNS = ["LoanPurpose", "MaritalStatus"]
     YES_NO_COLUMNS = ["HasMortgage", "HasDependents", "HasCoSigner"]
 
@@ -18,6 +33,7 @@ class LDPDataModule(pl.LightningDataModule):
         super().__init__()
         self.data_dir = data_dir
         self.batch_size = batch_size
+        self.setup_complete = False
 
     def prepare_data(self) -> None:
         response = requests.get(
@@ -27,45 +43,42 @@ class LDPDataModule(pl.LightningDataModule):
             file.write(response.content)
 
     def setup(self, stage: str) -> None:
-        data_df = pd.read_csv(os.path.join(self.data_dir, "train.csv"))
-        self.feature_engineer(data_df)
-        y_data = data_df["Default"].to_numpy()
-        x_data_transformed = self.transform_data(data_df)
-        self.width = x_data_transformed.shape[1]
+        if self.setup_complete == False:
+            self.setup_complete = True 
+            data_df = pd.read_csv(os.path.join(self.data_dir, "train.csv"))
+            self.df = data_df
+            self.df["ID"] = self.df.index
+            self.feature_engineer(data_df)
+            y_data = data_df["Default"].to_numpy()
+            z_data = data_df["ID"].to_numpy()
+            x_data_transformed = self.transform_data(data_df)
+            self.width = x_data_transformed.shape[1]
 
-        dataset_size = len(x_data_transformed)
-        train_size = int(0.8 * dataset_size)
-        val_size = int(0.1 * dataset_size)
-        test_size = dataset_size - train_size - val_size
+            dataset_size = len(x_data_transformed)
+            train_size = int(0.8 * dataset_size)
+            val_size = int(0.1 * dataset_size)
+            test_size = dataset_size - train_size - val_size
 
-        x_train_data, x_val_data, x_test_data = random_split(
-            x_data_transformed.to_numpy(), [train_size, val_size, test_size]
-        )
-        y_train_data, y_val_data, y_test_data = random_split(
-            y_data, [train_size, val_size, test_size]
-        )
+            dataset = TensorDataset(
+                torch.tensor(x_data_transformed.to_numpy(), dtype=torch.float32),
+                torch.tensor(y_data, dtype=torch.float32).view(-1, 1),
+                torch.tensor(z_data, dtype=torch.int32),
+            )
 
-        self.train_dataset = TensorDataset(
-            torch.tensor(x_train_data, dtype=torch.float32),
-            torch.tensor(y_train_data, dtype=torch.float32).view(-1, 1),
-        )
-        self.val_dataset = TensorDataset(
-            torch.tensor(x_val_data, dtype=torch.float32),
-            torch.tensor(y_val_data, dtype=torch.float32).view(-1, 1),
-        )
-        self.test_dataset = TensorDataset(
-            torch.tensor(x_test_data, dtype=torch.float32),
-            torch.tensor(y_test_data, dtype=torch.float32).view(-1, 1),
-        )
+            self.train_dataset, self.val_dataset, self.test_dataset = random_split(
+                dataset, (train_size, val_size, test_size)
+            )
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True)
+        return DataLoader(
+            self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=4
+        )
 
     def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=self.batch_size)
+        return DataLoader(self.val_dataset, batch_size=self.batch_size, num_workers=4)
 
     def test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=self.batch_size)
+        return DataLoader(self.test_dataset, batch_size=self.batch_size, num_workers=4)
 
     def feature_engineer(self, df):
         df["MonthlyIncome"] = round(df["Income"] / 12.0, 2)
@@ -132,9 +145,10 @@ class LDPDataModule(pl.LightningDataModule):
         for yes_no_column in set(self.YES_NO_COLUMNS) - set(self.REMOVE_FEATURES):
             train_df_tmp[yes_no_column] = df[yes_no_column].replace({"Yes": 1, "No": 0})
 
-        return train_df_tmp
+        normalized_data = self.normalize(train_df_tmp)
+        return normalized_data
 
-    def normalize(x):
+    def normalize(self, x):
         x_mean = np.mean(x, axis=0)
         x_std = np.std(x, axis=0)
 
