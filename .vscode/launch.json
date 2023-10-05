@@ -8,6 +8,14 @@
       "name": "Tune",
       "type": "python",
       "request": "launch",
+      "program": "torch_loan_default/tune.py",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Train",
+      "type": "python",
+      "request": "launch",
       "module": "torch_loan_default",
       "justMyCode": true
     } // {

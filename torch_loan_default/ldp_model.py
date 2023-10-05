@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
-import lightning.pytorch as pl
+import pytorch_lightning as pl
+import torch
 
 
 class Block(pl.LightningModule):
@@ -8,12 +9,12 @@ class Block(pl.LightningModule):
         super(Block, self).__init__()
         self.layer = nn.Linear(input_size, hidden_units)
         self.drop = nn.Dropout(dropout)
-        self.batchNorm = nn.BatchNorm1d(hidden_units)
+        # self.batchNorm = nn.BatchNorm1d(hidden_units)
         self.activation = activation
 
     def forward(self, x):
         x = self.layer(x)
-        x = self.batchNorm(x)
+        # x = self.batchNorm(x)
         x = self.drop(x)
         x = self.activation(x)
         return x
@@ -22,6 +23,7 @@ class Block(pl.LightningModule):
 class LDPModel(pl.LightningModule):
     def __init__(self, num_features, num_classes, hidden_units):
         super(LDPModel, self).__init__()
+        self.example_input_array = torch.Tensor(32, num_features)
         all_layers = []
         for hidden_unit in hidden_units:
             all_layers.append(Block(input_size=num_features, hidden_units=hidden_unit))
